@@ -1,0 +1,30 @@
+name: TextureManager
+version: 1.0.0-SNAPSHOT
+main: me.dagxam.texturemanager.TextureManagerPlugin
+api-version: '1.21'
+author: dagxam
+description: Управление пользовательскими текстурами и ресурс-паком Minecraft
+
+commands:
+  texture:
+    description: Управление текстурами и ресурс-паком
+    usage: /texture <reload|send|status|list>
+    aliases: [textures, tm]
+    permission: texturemanager.admin
+
+permissions:
+  texturemanager.admin:
+    description: Полный доступ к TextureManager
+    default: op
+  texturemanager.reload:
+    description: Пересборка ресурс-пака и горячая перезагрузка
+    default: op
+  texturemanager.send:
+    description: Отправка ресурс-пака игрокам
+    default: op
+  texturemanager.status:
+    description: Просмотр состояния TextureManager
+    default: op
+  texturemanager.list:
+    description: Просмотр списка установленных текстур
+    default: op
