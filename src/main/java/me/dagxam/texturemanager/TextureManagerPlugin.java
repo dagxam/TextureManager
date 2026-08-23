@@ -66,20 +66,10 @@ public final class TextureManagerPlugin extends JavaPlugin {
     }
 
     public void requestAsyncBuild(boolean backupOld) {
-        if (!buildRunning.compareAndSet(false, true)) {
-            rebuildQueued.set(true);
-            return;
-        }
+        if (!buildRunning.compareAndSet(false, true)) { rebuildQueued.set(true); return; }
         getServer().getScheduler().runTaskAsynchronously(this, () -> {
-            try {
-                do {
-                    rebuildQueued.set(false);
-                    buildResourcePack(backupOld);
-                } while (rebuildQueued.get());
-            } finally {
-                buildRunning.set(false);
-                if (rebuildQueued.getAndSet(false)) requestAsyncBuild(true);
-            }
+            try { do { rebuildQueued.set(false); buildResourcePack(backupOld); } while (rebuildQueued.get()); }
+            finally { buildRunning.set(false); if (rebuildQueued.getAndSet(false)) requestAsyncBuild(true); }
         });
     }
 
@@ -91,10 +81,25 @@ public final class TextureManagerPlugin extends JavaPlugin {
             Files.writeString(resourcePackFolder.resolve("sha1.txt"), lastBuild.sha1(), StandardCharsets.UTF_8);
             getLogger().info("Ресурс-пак собран. Текстур: " + lastBuild.texturesCount() + ", SHA-1: " + lastBuild.sha1());
             return true;
-        } catch (Exception exception) {
-            getLogger().severe("Не удалось собрать ресурс-пак: " + exception.getMessage());
-            return false;
-        }
+        } catch (Exception exception) { getLogger().severe("Не удалось собрать ресурс-пак: " + exception.getMessage()); return false; }
+    }
+
+    public void saveTargetTexture(Player player, Material material, String relativePath) {
+        player.sendMessage(color("&eПоиск стандартной текстуры &f" + material.getKey() + "&e..."));
+        // В этой версии путь сохраняется и подготавливается для загрузчика ассетов.
+        Path target = texturesFolder.resolve(relativePath);
+        getServer().getScheduler().runTaskAsynchronously(this, () -> {
+            try {
+                Files.createDirectories(target.getParent());
+                if (Files.exists(target)) {
+                    getServer().getScheduler().runTask(this, () -> player.sendMessage(color("&aТекстура уже сохранена: &ftextures/" + relativePath)));
+                    return;
+                }
+                getServer().getScheduler().runTask(this, () -> player.sendMessage(color("&eДля " + material.getKey() + " требуется получение официального asset hash. Автоматический resolver будет подключён следующим этапом.")));
+            } catch (IOException exception) {
+                getServer().getScheduler().runTask(this, () -> player.sendMessage(color("&cНе удалось подготовить файл: " + exception.getMessage())));
+            }
+        });
     }
 
     public void sendPack(Player player) {
@@ -102,9 +107,8 @@ public final class TextureManagerPlugin extends JavaPlugin {
         if (build == null) return;
         String url = getPackUrl();
         if (url.isBlank()) { getLogger().warning("Ресурс-пак не отправлен игроку " + player.getName() + ": не указан внешний адрес."); return; }
-        try {
-            player.setResourcePack(url, build.sha1().getBytes(StandardCharsets.UTF_8), Component.text(getConfig().getString("resource-pack.сообщение", "Используется пользовательский ресурс-пак сервера.")), getConfig().getBoolean("resource-pack.обязательный", false));
-        } catch (IllegalArgumentException exception) { getLogger().warning("Некорректный URL ресурс-пака: " + url); }
+        try { player.setResourcePack(url, build.sha1().getBytes(StandardCharsets.UTF_8), Component.text(getConfig().getString("resource-pack.сообщение", "Используется пользовательский ресурс-пак сервера.")), getConfig().getBoolean("resource-pack.обязательный", false)); }
+        catch (IllegalArgumentException exception) { getLogger().warning("Некорректный URL ресурс-пака: " + url); }
     }
 
     public String getPackUrl() {
@@ -115,11 +119,9 @@ public final class TextureManagerPlugin extends JavaPlugin {
         return address + ":" + getConfig().getInt("resource-pack.встроенный-сервер.порт", 8080) + "/TextureManager.zip";
     }
 
-    public void showTargetTexture(Player player, Material material, String path) {
-        player.sendMessage(color("&6==== TextureManager ====")); player.sendMessage(color("&7Объект: &f" + material.getKey())); player.sendMessage(color("&7Стандартная текстура: &f" + path)); player.sendMessage(color("&7Положите свою PNG сюда: &ftextures/" + path));
-    }
-    public void showBlockTexture(Player player, Block block) { Material material = block.getType(); showTargetTexture(player, material, "block/" + material.getKey().getKey() + ".png"); }
-    public void showEntityTexture(Player player, Entity entity) { String path="entity/"+entity.getType().getKey().getKey()+".png"; player.sendMessage(color("&6==== TextureManager ====")); player.sendMessage(color("&7Сущность: &f"+entity.getType().getKey())); player.sendMessage(color("&7Предполагаемый путь текстуры: &f"+path)); player.sendMessage(color("&eВнимание: у некоторых сущностей текстура состоит из нескольких PNG.")); player.sendMessage(color("&7Положите свою PNG сюда: &ftextures/"+path)); }
+    public void showTargetTexture(Player player, Material material, String path) { saveTargetTexture(player, material, path); }
+    public void showBlockTexture(Player player, Block block) { Material material=block.getType(); saveTargetTexture(player, material, "block/"+material.getKey().getKey()+".png"); }
+    public void showEntityTexture(Player player, Entity entity) { player.sendMessage(color("&6==== TextureManager ====")); player.sendMessage(color("&7Сущность: &f"+entity.getType().getKey())); player.sendMessage(color("&7Для мобов требуется точное сопоставление нескольких официальных PNG.")); }
 
     private void backupCurrentPack() throws IOException { Files.createDirectories(backupFolder); String timestamp=LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss")); Files.copy(packFile,backupFolder.resolve("TextureManager-"+timestamp+".zip"),StandardCopyOption.REPLACE_EXISTING); int maxFiles=getConfig().getInt("резервные-копии.максимум-файлов",10); try(var stream=Files.list(backupFolder)){List<Path> backups=stream.filter(Files::isRegularFile).sorted(Comparator.comparingLong(this::lastModifiedSafe).reversed()).toList(); for(int i=maxFiles;i<backups.size();i++)Files.deleteIfExists(backups.get(i));} }
     private long lastModifiedSafe(Path path){try{return Files.getLastModifiedTime(path).toMillis();}catch(IOException e){return 0L;}}
