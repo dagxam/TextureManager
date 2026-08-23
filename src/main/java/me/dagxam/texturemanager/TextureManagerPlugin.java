@@ -26,6 +26,12 @@ public final class TextureManagerPlugin extends JavaPlugin {
 
         createPluginFolders();
 
+        if (getCommand("texture") != null) {
+            getCommand("texture").setExecutor(new TextureCommand(this));
+        } else {
+            getLogger().severe("Команда texture не найдена в plugin.yml.");
+        }
+
         getLogger().info(color(getMessage("запуск", "Плагин запущен.")));
         getLogger().info("Папка пользовательских текстур: " + texturesFolder.toAbsolutePath());
     }
