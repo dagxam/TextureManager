@@ -1,5 +1,6 @@
 package me.dagxam.texturemanager;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -8,7 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -27,7 +28,8 @@ public final class TextureManagerPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        loadPaths(); createPluginFolders();
+        loadPaths();
+        createPluginFolders();
         if (getCommand("texture") != null) getCommand("texture").setExecutor(new TextureCommand(this));
         if (getCommand("texturetarget") != null) getCommand("texturetarget").setExecutor(new TextureTargetCommand(this));
         getServer().getPluginManager().registerEvents(new ResourcePackListener(this), this);
@@ -37,11 +39,10 @@ public final class TextureManagerPlugin extends JavaPlugin {
     }
 
     private void startServices() {
-        String mode = getConfig().getString("resource-pack.режим", "built-in");
-        if ("built-in".equalsIgnoreCase(mode)) {
+        if ("built-in".equalsIgnoreCase(getConfig().getString("resource-pack.режим", "built-in"))) {
             try {
-                int port = getConfig().getInt("resource-pack.встроенный-сервер.порт", 8080);
-                httpServer = new ResourcePackHttpServer(this, packFile, port);
+                httpServer = new ResourcePackHttpServer(this, packFile,
+                        getConfig().getInt("resource-pack.встроенный-сервер.порт", 8080));
                 httpServer.start();
             } catch (IOException exception) {
                 getLogger().severe("Не удалось запустить встроенный HTTP-сервер: " + exception.getMessage());
@@ -68,7 +69,7 @@ public final class TextureManagerPlugin extends JavaPlugin {
             lastBuild = new ResourcePackBuilder().build(packFile,
                     getConfig().getString("ресурс-пак.описание", "Пользовательский ресурс-пак сервера"),
                     PackFormatResolver.resolvePackFormat(), textures);
-            Files.writeString(resourcePackFolder.resolve("sha1.txt"), lastBuild.sha1());
+            Files.writeString(resourcePackFolder.resolve("sha1.txt"), lastBuild.sha1(), StandardCharsets.UTF_8);
             getLogger().info("Ресурс-пак собран. Текстур: " + lastBuild.texturesCount() + ", SHA-1: " + lastBuild.sha1());
             return true;
         } catch (Exception exception) {
@@ -78,25 +79,30 @@ public final class TextureManagerPlugin extends JavaPlugin {
     }
 
     public void sendPack(Player player) {
-        if (lastBuild == null) { player.sendMessage(color("&cРесурс-пак ещё не собран.")); return; }
+        if (lastBuild == null) return;
         String url = getPackUrl();
-        if (url.isBlank()) { player.sendMessage(color("&cНе указан внешний адрес ресурс-пака в config.yml.")); return; }
+        if (url.isBlank()) {
+            getLogger().warning("Ресурс-пак не отправлен игроку " + player.getName() + ": не указан внешний адрес.");
+            return;
+        }
         try {
             boolean required = getConfig().getBoolean("resource-pack.обязательный", false);
             String prompt = getConfig().getString("resource-pack.сообщение", "Используется пользовательский ресурс-пак сервера.");
-            player.setResourcePack(new URI(url), lastBuild.sha1().getBytes(), prompt, required);
-        } catch (URISyntaxException exception) {
+            player.setResourcePack(URI.create(url), lastBuild.sha1().getBytes(StandardCharsets.UTF_8), Component.text(prompt), required);
+        } catch (IllegalArgumentException exception) {
             getLogger().warning("Некорректный URL ресурс-пака: " + url);
         }
     }
 
     public String getPackUrl() {
-        String mode = getConfig().getString("resource-pack.режим", "built-in");
-        if ("external".equalsIgnoreCase(mode)) return getConfig().getString("resource-pack.внешний-url", "");
+        if ("external".equalsIgnoreCase(getConfig().getString("resource-pack.режим", "built-in"))) {
+            return getConfig().getString("resource-pack.внешний-url", "").trim();
+        }
         String address = getConfig().getString("resource-pack.встроенный-сервер.внешний-адрес", "").trim();
         if (address.isEmpty()) return "";
         if (!address.startsWith("http://") && !address.startsWith("https://")) address = "http://" + address;
-        return address + ":" + getConfig().getInt("resource-pack.встроенный-сервер.порt", 8080) + "/TextureManager.zip";
+        int port = getConfig().getInt("resource-pack.встроенный-сервер.порт", 8080);
+        return address + ":" + port + "/TextureManager.zip";
     }
 
     public void showTargetTexture(Player player, Material material, String path) {
@@ -116,6 +122,7 @@ public final class TextureManagerPlugin extends JavaPlugin {
             for (int i = maxFiles; i < backups.size(); i++) Files.deleteIfExists(backups.get(i));
         }
     }
+
     private long lastModifiedSafe(Path path) { try { return Files.getLastModifiedTime(path).toMillis(); } catch (IOException e) { return 0L; } }
     private void loadPaths() { Path data=getDataFolder().toPath(); texturesFolder=data.resolve(getConfig().getString("папки.текстуры","textures")); resourcePackFolder=data.resolve(getConfig().getString("папки.ресурс-пак","resourcepack")); backupFolder=data.resolve(getConfig().getString("папки.резервные-копии","resourcepack/backup")); packFile=resourcePackFolder.resolve(getConfig().getString("ресурс-пак.имя-файла","TextureManager.zip")); }
     private void createPluginFolders() { try { Files.createDirectories(texturesFolder); Files.createDirectories(resourcePackFolder); Files.createDirectories(backupFolder); } catch(IOException e){ getLogger().severe("Не удалось создать папки: "+e.getMessage()); } }
