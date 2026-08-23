@@ -3,36 +3,28 @@ version: 1.0.0-SNAPSHOT
 main: me.dagxam.texturemanager.TextureManagerPlugin
 api-version: '1.21'
 author: dagxam
-description: Управление пользовательскими текстурами и ресурс-паком Minecraft
+description: Автоматическая замена стандартных текстур Minecraft из папки плагина
 
 commands:
   texture:
-    description: Управление текстурами и ресурс-паком
+    description: Управление пользовательскими текстурами и автоматическим ресурс-паком
     usage: /texture <reload|send|status|list>
     aliases: [textures, tm]
     permission: texturemanager.admin
-  texturetarget:
-    description: Определить стандартную текстуру блока или предмета
-    usage: /texturetarget
-    aliases: [targettexture, tt]
-    permission: texturemanager.target
 
 permissions:
   texturemanager.admin:
     description: Полный доступ к TextureManager
     default: op
   texturemanager.reload:
-    description: Пересборка ресурс-пака и горячая перезагрузка
+    description: Проверить PNG и пересобрать ресурс-пак
     default: op
   texturemanager.send:
-    description: Отправка ресурс-пака игрокам
+    description: Отправить готовый ресурс-пак игрокам
     default: op
   texturemanager.status:
-    description: Просмотр состояния TextureManager
+    description: Просмотреть состояние TextureManager
     default: op
   texturemanager.list:
-    description: Просмотр списка установленных текстур
-    default: op
-  texturemanager.target:
-    description: Определение стандартного пути текстуры объекта
+    description: Просмотреть список загруженных текстур
     default: op
