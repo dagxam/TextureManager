@@ -11,6 +11,11 @@ commands:
     usage: /texture <reload|send|status|list>
     aliases: [textures, tm]
     permission: texturemanager.admin
+  texturetarget:
+    description: Определить стандартную текстуру блока или предмета
+    usage: /texturetarget
+    aliases: [targettexture, tt]
+    permission: texturemanager.target
 
 permissions:
   texturemanager.admin:
@@ -27,4 +32,7 @@ permissions:
     default: op
   texturemanager.list:
     description: Просмотр списка установленных текстур
+    default: op
+  texturemanager.target:
+    description: Определение стандартного пути текстуры объекта
     default: op
