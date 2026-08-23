@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  сборка:
+  build:
     name: Проверка и сборка плагина
     runs-on: ubuntu-latest
 
