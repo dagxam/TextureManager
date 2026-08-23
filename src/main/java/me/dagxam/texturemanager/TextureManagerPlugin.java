@@ -3,12 +3,13 @@ package me.dagxam.texturemanager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -88,7 +89,7 @@ public final class TextureManagerPlugin extends JavaPlugin {
         try {
             boolean required = getConfig().getBoolean("resource-pack.обязательный", false);
             String prompt = getConfig().getString("resource-pack.сообщение", "Используется пользовательский ресурс-пак сервера.");
-            player.setResourcePack(URI.create(url), lastBuild.sha1().getBytes(StandardCharsets.UTF_8), Component.text(prompt), required);
+            player.setResourcePack(url, lastBuild.sha1().getBytes(StandardCharsets.UTF_8), Component.text(prompt), required);
         } catch (IllegalArgumentException exception) {
             getLogger().warning("Некорректный URL ресурс-пака: " + url);
         }
@@ -109,6 +110,21 @@ public final class TextureManagerPlugin extends JavaPlugin {
         player.sendMessage(color("&6==== TextureManager ===="));
         player.sendMessage(color("&7Объект: &f" + material.getKey()));
         player.sendMessage(color("&7Стандартная текстура: &f" + path));
+        player.sendMessage(color("&7Положите свою PNG сюда: &ftextures/" + path));
+    }
+
+    public void showBlockTexture(Player player, Block block) {
+        Material material = block.getType();
+        showTargetTexture(player, material, "block/" + material.getKey().getKey() + ".png");
+    }
+
+    public void showEntityTexture(Player player, Entity entity) {
+        String entityName = entity.getType().getKey().getKey();
+        String path = "entity/" + entityName + ".png";
+        player.sendMessage(color("&6==== TextureManager ===="));
+        player.sendMessage(color("&7Сущность: &f" + entity.getType().getKey()));
+        player.sendMessage(color("&7Предполагаемый путь текстуры: &f" + path));
+        player.sendMessage(color("&eВнимание: у некоторых сущностей стандартная текстура состоит из нескольких PNG или использует вложенные папки."));
         player.sendMessage(color("&7Положите свою PNG сюда: &ftextures/" + path));
     }
 
