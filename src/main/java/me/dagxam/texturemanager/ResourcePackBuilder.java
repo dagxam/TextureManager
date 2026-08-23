@@ -13,73 +13,42 @@ import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/**
- * Создаёт ZIP ресурс-пака из простых папок пользователя.
- */
+/** Создаёт ZIP ресурс-пака из простых папок пользователя. */
 public final class ResourcePackBuilder {
-
     public BuildResult build(Path outputFile, String description, int packFormat, List<TextureInfo> textures) throws IOException {
         Files.createDirectories(outputFile.getParent());
+        Path temporaryFile = outputFile.resolveSibling(outputFile.getFileName() + ".tmp");
+        Files.deleteIfExists(temporaryFile);
 
-        try (OutputStream output = Files.newOutputStream(outputFile);
-             ZipOutputStream zip = new ZipOutputStream(output)) {
-
-            String meta = "{\n" +
-                    "  \"pack\": {\n" +
-                    "    \"pack_format\": " + packFormat + ",\n" +
-                    "    \"description\": \"" + escapeJson(description) + "\"\n" +
-                    "  }\n" +
-                    "}\n";
+        try (OutputStream output = Files.newOutputStream(temporaryFile); ZipOutputStream zip = new ZipOutputStream(output)) {
+            String meta = "{\n  \"pack\": {\n    \"pack_format\": " + packFormat + ",\n    \"description\": \"" + escapeJson(description) + "\"\n  }\n}\n";
             writeBytes(zip, "pack.mcmeta", meta.getBytes(StandardCharsets.UTF_8));
-
             for (TextureInfo texture : textures) {
-                String entryName = "assets/minecraft/textures/" + texture.relativePath();
-                ZipEntry entry = new ZipEntry(entryName);
+                ZipEntry entry = new ZipEntry("assets/minecraft/textures/" + texture.relativePath());
                 zip.putNextEntry(entry);
-                try (InputStream input = Files.newInputStream(texture.source())) {
-                    input.transferTo(zip);
-                }
+                try (InputStream input = Files.newInputStream(texture.source())) { input.transferTo(zip); }
                 zip.closeEntry();
             }
         }
 
+        Files.move(temporaryFile, outputFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         String sha1 = calculateSha1(outputFile);
         return new BuildResult(outputFile, sha1, Files.size(outputFile), textures.size());
     }
 
-    private void writeBytes(ZipOutputStream zip, String name, byte[] data) throws IOException {
-        zip.putNextEntry(new ZipEntry(name));
-        zip.write(data);
-        zip.closeEntry();
-    }
-
+    private void writeBytes(ZipOutputStream zip, String name, byte[] data) throws IOException { zip.putNextEntry(new ZipEntry(name)); zip.write(data); zip.closeEntry(); }
     public String calculateSha1(Path file) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-1");
             try (InputStream input = Files.newInputStream(file)) {
-                byte[] buffer = new byte[8192];
-                int read;
-                while ((read = input.read(buffer)) != -1) {
-                    digest.update(buffer, 0, read);
-                }
+                byte[] buffer = new byte[8192]; int read;
+                while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read);
             }
             StringBuilder result = new StringBuilder();
-            for (byte value : digest.digest()) {
-                result.append(String.format(Locale.ROOT, "%02x", value));
-            }
+            for (byte value : digest.digest()) result.append(String.format(Locale.ROOT, "%02x", value));
             return result.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IOException("В Java отсутствует алгоритм SHA-1.", exception);
-        }
+        } catch (NoSuchAlgorithmException exception) { throw new IOException("В Java отсутствует алгоритм SHA-1.", exception); }
     }
-
-    private String escapeJson(String value) {
-        return value.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r");
-    }
-
-    public record BuildResult(Path file, String sha1, long size, int texturesCount) {
-    }
+    private String escapeJson(String value) { return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r"); }
+    public record BuildResult(Path file, String sha1, long size, int texturesCount) {}
 }
